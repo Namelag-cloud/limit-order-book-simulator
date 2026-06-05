@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from datetime import datetime
 from typing import Optional
-
+from sortedcontainers import SortedDict
 
 # ===============================
 # Global Variables
@@ -78,9 +78,9 @@ class Trade:
 class OrderBook:
 
     def __init__(self):
-
-        self.bids: dict[int, list[Order]] = {}
-        self.asks: dict[int, list[Order]] = {}
+        
+        self.bids: SortedDict[int, list[Order]] = SortedDict()
+        self.asks: SortedDict[int, list[Order]] = SortedDict()
 
         self.order_lookup: dict[int, Order] = {}
 
@@ -140,14 +140,14 @@ class OrderBook:
         if not self.bids:
             return None
 
-        return max(self.bids.keys())
+        return self.bids.peekitem(-1)[0]
 
     def get_best_ask(self) -> int | None:
 
         if not self.asks:
             return None
 
-        return min(self.asks.keys())
+        return self.asks.peekitem(0)[0]
 
     def get_best_bid_order(self) -> Order | None:
 
