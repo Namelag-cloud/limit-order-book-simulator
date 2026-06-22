@@ -3,6 +3,7 @@ from enum import Enum
 from datetime import datetime
 from typing import Optional
 from sortedcontainers import SortedDict
+from copy import deepcopy
 
 # ===============================
 # Global Variables
@@ -188,7 +189,7 @@ class Exchange:
         self.order_book = OrderBook()
 
         self.trade_history = []
-        self.order_history = []
+        self.order_registry = []
 
         self.next_order_id = 1
         self.next_trade_id = 1
@@ -198,9 +199,10 @@ class Exchange:
         if not validate_order(order):
             raise ValueError("Order not Valid. Submit Order fn")
         else:
+            self.record_orders(order)
             self.process_order(order) 
 
-    def cancel_order(self, order_id: int) -> bool:
+    def cancel_order(self, order_id: int) -> bool: # cant cancel market orders unless they are added to the orderbook (which they are added if not filled or partially filled)
 
         if order_id not in self.order_book.order_lookup:
             return False
@@ -325,7 +327,9 @@ class Exchange:
         self.trade_history.append(trade)
 
     def record_orders(self, order: Order):
-        self.order_history.append(order)
+        self.order_registry.append(
+            deepcopy(order)
+        )
 
 # =========================
 # EXCHANGE RULES
@@ -495,3 +499,4 @@ if __name__ == "__main__":
     print("\nBook:")
     print(exchange.order_book.asks)
     
+   
