@@ -188,8 +188,8 @@ class Exchange:
 
         self.order_book = OrderBook()
 
-        self.trade_history = []
-        self.order_registry = []
+        self.trade_history: list[Trade] = []
+        self.order_registry: dict[int, Order] = {}
 
         self.next_order_id = 1
         self.next_trade_id = 1
@@ -202,7 +202,7 @@ class Exchange:
             self.record_orders(order)
             self.process_order(order) 
 
-    def cancel_order(self, order_id: int) -> bool: # cant cancel market orders unless they are added to the orderbook (which they are added if not filled or partially filled)
+    def cancel_order(self, order_id: int) -> bool: 
 
         if order_id not in self.order_book.order_lookup:
             return False
