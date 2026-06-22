@@ -188,6 +188,7 @@ class Exchange:
         self.order_book = OrderBook()
 
         self.trade_history = []
+        self.order_history = []
 
         self.next_order_id = 1
         self.next_trade_id = 1
@@ -319,9 +320,12 @@ class Exchange:
             else:
                 self.order_book.add_order(incoming_order)
                     
+
     def record_trade(self, trade: Trade):
         self.trade_history.append(trade)
 
+    def record_orders(self, order: Order):
+        self.order_history.append(order)
 
 # =========================
 # EXCHANGE RULES
@@ -490,3 +494,4 @@ if __name__ == "__main__":
 
     print("\nBook:")
     print(exchange.order_book.asks)
+    
