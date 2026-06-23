@@ -189,7 +189,7 @@ class Exchange:
         self.order_book = OrderBook()
 
         self.trade_history: list[Trade] = []
-        self.order_registry: dict[int, Order] = {}
+        self.submitted_orders: dict[int, Order] = {}
 
         self.next_order_id = 1
         self.next_trade_id = 1
@@ -327,9 +327,8 @@ class Exchange:
         self.trade_history.append(trade)
 
     def record_orders(self, order: Order):
-        self.order_registry.append(
-            deepcopy(order)
-        )
+        self.submitted_orders[order.order_id] = deepcopy(order)
+
 
 # =========================
 # EXCHANGE RULES
@@ -454,7 +453,7 @@ if __name__ == "__main__":
         side=Side.SELL,
         order_type=OrderType.LIMIT,
 
-        price=10000,
+        price=10100,
         asset="BTC",
 
         quantity=5,
@@ -465,19 +464,39 @@ if __name__ == "__main__":
 
     exchange.submit_order(sell_order_2)
 
+    sell_order_3 = Order(
+        order_id=4,
+        trader_id=104,
+        timestamp=datetime.now(),
+
+        side=Side.SELL,
+        order_type=OrderType.LIMIT,
+
+        price=10200,
+        asset="BTC",
+
+        quantity=5,
+        remaining_quantity=5,
+
+        status=OrderStatus.ACTIVE
+    )
+
+    exchange.submit_order(sell_order_3)
+
+
     buy_order = Order(
         order_id=3,
         trader_id=103,
         timestamp=datetime.now(),
 
         side=Side.BUY,
-        order_type=OrderType.LIMIT,
+        order_type=OrderType.MARKET,
 
-        price=10000,
+        price=None,
         asset="BTC",
 
-        quantity=7,
-        remaining_quantity=7,
+        quantity=12,
+        remaining_quantity=12,
 
         status=OrderStatus.ACTIVE
     )
