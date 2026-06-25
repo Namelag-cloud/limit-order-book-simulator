@@ -1,6 +1,13 @@
 
+from datetime import datetime
 
-from src.core import *
+from src.core import (
+    Exchange,
+    Order,
+    Side,
+    OrderType,
+    OrderStatus,
+)
 from src.helper import make_limit_order
 
 
@@ -9,11 +16,17 @@ def test_exact_fill():
     exchange = Exchange(reference_price=100)
 
     sell = make_limit_order(
-        1, 101, Side.SELL, 100, 5
-    )
+        trader_id=101,
+        side=Side.SELL,
+        price=100,
+        quantity=5,
+    )   
 
     buy = make_limit_order(
-        2, 102, Side.BUY, 100, 5
+        trader_id=102,
+        side=Side.BUY,
+        price=100,
+        quantity=5,
     )
 
     exchange.submit_order(sell)
@@ -34,11 +47,17 @@ def test_partial_fill():
     exchange = Exchange(reference_price=100)
 
     sell = make_limit_order(
-        1, 101, Side.SELL, 100, 10
-    )
+        trader_id=101,
+        side=Side.SELL,
+        price=100,
+        quantity=10,
+    ) 
 
     buy = make_limit_order(
-        2, 102, Side.BUY, 100, 5
+        trader_id=102,
+        side=Side.BUY,
+        price=100,
+        quantity=5,
     )
 
     exchange.submit_order(sell)
@@ -62,15 +81,24 @@ def test_price_time_priority():
     exchange = Exchange(reference_price=100)
 
     sell1 = make_limit_order(
-        1, 101, Side.SELL, 100, 5
-    )
+        trader_id=101,
+        side=Side.SELL,
+        price=100,
+        quantity=5,
+    ) 
 
     sell2 = make_limit_order(
-        2, 102, Side.SELL, 100, 5
-    )
+        trader_id=102,
+        side=Side.SELL,
+        price=100,
+        quantity=5,
+    ) 
 
     buy = make_limit_order(
-        3, 103, Side.BUY, 100, 7
+        trader_id=103,
+        side=Side.BUY,
+        price=100,
+        quantity=7,
     )
 
     exchange.submit_order(sell1)
@@ -91,11 +119,17 @@ def test_no_match():
     exchange = Exchange(reference_price=100)
 
     sell = make_limit_order(
-        1, 101, Side.SELL, 101, 5
-    )
+        trader_id=101,
+        side=Side.SELL,
+        price=101,
+        quantity=5,
+    ) 
 
     buy = make_limit_order(
-        2, 102, Side.BUY, 100, 5
+        trader_id=102,
+        side=Side.BUY,
+        price=100,
+        quantity=5,
     )
 
     exchange.submit_order(sell)
@@ -114,15 +148,24 @@ def test_book_sweep():
     exchange = Exchange(reference_price=100)
 
     sell1 = make_limit_order(
-        1, 101, Side.SELL, 100, 5
-    )
+        trader_id=101,
+        side=Side.SELL,
+        price=100,
+        quantity=5,
+    ) 
 
     sell2 = make_limit_order(
-        2, 102, Side.SELL, 101, 5
-    )
+        trader_id=102,
+        side=Side.SELL,
+        price=101,
+        quantity=5,
+    ) 
 
     buy = make_limit_order(
-        3, 103, Side.BUY, 101, 10
+        trader_id=103,
+        side=Side.BUY,
+        price=101,
+        quantity=10,
     )
 
     exchange.submit_order(sell1)
@@ -141,7 +184,6 @@ def test_market_order_empty_book():
     exchange = Exchange(reference_price=100)
 
     market_buy = Order(
-        order_id=1,
         trader_id=101,
         timestamp=datetime.now(),
 
@@ -169,8 +211,11 @@ def test_cancel_order():
     exchange = Exchange(reference_price=100)
 
     sell = make_limit_order(
-        1, 101, Side.SELL, 100, 5
-    )
+        trader_id=101,
+        side=Side.SELL,
+        price=100,
+        quantity=5,
+    ) 
 
     exchange.submit_order(sell)
 
@@ -203,24 +248,32 @@ def test_market_order_sweeps_multiple_levels():
 
     exchange.submit_order(
         make_limit_order(
-            1, 101, Side.SELL, 100, 5
-        )
+        trader_id=101,
+        side=Side.SELL,
+        price=100,
+        quantity=5,
+    ) 
     )
 
     exchange.submit_order(
         make_limit_order(
-            2, 102, Side.SELL, 101, 5
-        )
+        trader_id=102,
+        side=Side.SELL,
+        price=101,
+        quantity=5,
+    ) 
     )
 
     exchange.submit_order(
         make_limit_order(
-            3, 103, Side.SELL, 102, 5
-        )
+        trader_id=103,
+        side=Side.SELL,
+        price=102,
+        quantity=5,
+    ) 
     )
 
     market_buy = Order(
-        order_id=4,
         trader_id=104,
         timestamp=datetime.now(),
 
@@ -255,13 +308,15 @@ def test_market_order_partial_fill():
     exchange = Exchange(reference_price=100)
 
     sell = make_limit_order(
-        1, 101, Side.SELL, 100, 5
-    )
+        trader_id=101,
+        side=Side.SELL,
+        price=100,
+        quantity=5,
+    ) 
 
     exchange.submit_order(sell)
 
     market_buy = Order(
-        order_id=2,
         trader_id=102,
         timestamp=datetime.now(),
 
@@ -293,11 +348,17 @@ def test_trade_executes_at_resting_price():
     exchange = Exchange(reference_price=100)
 
     sell = make_limit_order(
-        1, 101, Side.SELL, 100, 5
-    )
+        trader_id=101,
+        side=Side.SELL,
+        price=100,
+        quantity=5,
+    ) 
 
     buy = make_limit_order(
-        2, 102, Side.BUY, 105, 5
+        trader_id=102,
+        side=Side.BUY,
+        price=105,
+        quantity=5,
     )
 
     exchange.submit_order(sell)
@@ -314,18 +375,27 @@ def test_fifo_same_price_level():
     exchange = Exchange(reference_price=100)
 
     sell1 = make_limit_order(
-        1, 101, Side.SELL, 100, 5
-    )
+        trader_id=101,
+        side=Side.SELL,
+        price=100,
+        quantity=5,
+    ) 
 
     sell2 = make_limit_order(
-        2, 102, Side.SELL, 100, 5
-    )
+        trader_id=102,
+        side=Side.SELL,
+        price=100,
+        quantity=5,
+    ) 
 
     exchange.submit_order(sell1)
     exchange.submit_order(sell2)
 
     buy = make_limit_order(
-        3, 103, Side.BUY, 100, 5
+        trader_id=103,
+        side=Side.BUY,
+        price=100,
+        quantity=5,
     )
 
     exchange.submit_order(buy)
@@ -342,7 +412,6 @@ def test_market_order_never_rests():
     exchange = Exchange(reference_price=100)
 
     market_buy = Order(
-        order_id=1,
         trader_id=101,
         timestamp=datetime.now(),
 
@@ -364,5 +433,66 @@ def test_market_order_never_rests():
         market_buy.order_id
         not in exchange.order_book.order_lookup
     )
+
+
+
+def test_exchange_assigns_order_ids():
+
+    exchange = Exchange(reference_price=100)
+
+    order1 = make_limit_order(
+        trader_id=101,
+        side=Side.BUY,
+        price=100,
+        quantity=1
+    )
+
+    order2 = make_limit_order(
+        trader_id=102,
+        side=Side.SELL,
+        price=101,
+        quantity=1
+    )
+
+    assert order1.order_id is None
+    assert order2.order_id is None
+
+    exchange.submit_order(order1)
+    exchange.submit_order(order2)
+
+    assert order1.order_id == 1
+    assert order2.order_id == 2
+
+    assert exchange.next_order_id == 3
+
+
+
+
+
+def test_submit_order_returns_changed_orders():
+
+    exchange = Exchange(reference_price=100)
+
+    sell = make_limit_order(
+        trader_id=101,
+        side=Side.SELL,
+        price=100,
+        quantity=5
+    )
+
+    buy = make_limit_order(
+        trader_id=102,
+        side=Side.BUY,
+        price=100,
+        quantity=5
+    )
+
+    exchange.submit_order(sell)
+
+    changed_orders = exchange.submit_order(buy)
+
+    assert sell in changed_orders
+    assert buy in changed_orders
+
 
 

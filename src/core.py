@@ -40,7 +40,6 @@ class OrderStatus(Enum):
 @dataclass
 class Order:
 
-    order_id: int
     trader_id: int
 
     timestamp: datetime
@@ -55,6 +54,8 @@ class Order:
     remaining_quantity: int 
 
     status: OrderStatus
+    
+    order_id: int | None = None
 
 
 @dataclass
@@ -194,13 +195,18 @@ class Exchange:
         self.next_order_id = 1
         self.next_trade_id = 1
 
-    def submit_order(self, order: Order):
+
+    def submit_order(self, order: Order) -> list[Order]:
+
+        order.order_id = self.next_order_id
+        self.next_order_id += 1
 
         if not validate_order(order):
-            raise ValueError("Order not Valid. Submit Order fn")
-        else:
-            self.record_orders(order)
-            self.process_order(order) 
+            raise ValueError(...)
+
+        self.record_orders(order)
+
+        return self.process_order(order)
 
     def cancel_order(self, order_id: int) -> bool: 
 
@@ -216,7 +222,9 @@ class Exchange:
     def process_order(
         self,
         incoming_order: Order
-    ):
+    ) -> list[Order]:
+
+        changed_orders = {}
 
         while incoming_order.remaining_quantity > 0:  
 
@@ -287,6 +295,7 @@ class Exchange:
             if buy_order.remaining_quantity == 0:
 
                 buy_order.status = OrderStatus.FILLED
+                changed_orders[buy_order.order_id] = buy_order
 
                 if buy_order is not incoming_order:
                     self.order_book.remove_order(
@@ -298,10 +307,13 @@ class Exchange:
                 buy_order.status = (
                     OrderStatus.PARTIALLY_FILLED  # resting order status change
                 )
+                changed_orders[buy_order.order_id] = buy_order
+
 
             if sell_order.remaining_quantity == 0:
 
                 sell_order.status = OrderStatus.FILLED
+                changed_orders[sell_order.order_id] = sell_order
 
                 if sell_order is not incoming_order:
                     self.order_book.remove_order(
@@ -313,6 +325,7 @@ class Exchange:
                 sell_order.status = (
                     OrderStatus.PARTIALLY_FILLED   # resting order status change
                 )
+                changed_orders[sell_order.order_id] = sell_order
 
         if incoming_order.remaining_quantity > 0:  # After all the transactions/trading of the incoming market order, it gets added to the book as cancelled
 
@@ -320,8 +333,11 @@ class Exchange:
                     incoming_order.status = OrderStatus.CANCELLED
 
             else:
+                incoming_order.status = OrderStatus.ACTIVE
                 self.order_book.add_order(incoming_order)
-                    
+
+
+        return list(changed_orders.values())
 
     def record_trade(self, trade: Trade):
         self.trade_history.append(trade)
@@ -425,7 +441,6 @@ if __name__ == "__main__":
     exchange = Exchange(reference_price=10000)
 
     sell_order_1 = Order(
-        order_id=1,
         trader_id=101,
         timestamp=datetime.now(),
 
@@ -446,7 +461,6 @@ if __name__ == "__main__":
     sleep(1)
 
     sell_order_2 = Order(
-        order_id=2,
         trader_id=102,
         timestamp=datetime.now(),
 
@@ -465,7 +479,6 @@ if __name__ == "__main__":
     exchange.submit_order(sell_order_2)
 
     sell_order_3 = Order(
-        order_id=4,
         trader_id=104,
         timestamp=datetime.now(),
 
@@ -485,7 +498,6 @@ if __name__ == "__main__":
 
 
     buy_order = Order(
-        order_id=3,
         trader_id=103,
         timestamp=datetime.now(),
 
