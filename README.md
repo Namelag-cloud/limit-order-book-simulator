@@ -1,23 +1,30 @@
 # Limit Order Book Simulator
 
-A Python implementation of a continuous double-auction exchange designed to explore market microstructure, quantitative finance, and trading system design.
+A Python implementation of a continuous double-auction exchange for exploring market microstructure, quantitative finance, and agent-based market simulation.
 
-## Current Features
+## Features
 
+### Exchange
+
+- Continuous Double Auction
 - Limit Orders
 - Market Orders
-- Price-Time Priority
 - FIFO Matching
+- Price-Time Priority
 - Partial Fills
+- Multi-Level Book Sweeps
 - Order Cancellation
 - Trade History
 
-## Planned Features
+### Trader Framework
 
-- Multiple Assets
-- Trader Agents
-- Market Makers
-- Order Flow Simulation
-- Market Dynamics
-- Statistical Analysis
-- Research Experiments
+- Trader Base Class
+- RandomTrader Agent
+- Active Order Tracking
+
+## Current Focus
+
+The simulator currently prioritizes exchange correctness and modular architecture before introducing realistic trader behavior, market dynamics, and research experiments.
+
+## Author
+Namelag
