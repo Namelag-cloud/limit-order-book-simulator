@@ -26,5 +26,3 @@ A Python implementation of a continuous double-auction exchange for exploring ma
 
 The simulator currently prioritizes exchange correctness and modular architecture before introducing realistic trader behavior, market dynamics, and research experiments.
 
-## Author
-Namelag
