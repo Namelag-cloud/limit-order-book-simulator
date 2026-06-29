@@ -14,7 +14,7 @@ def make_limit_order(
     side,
     price,
     quantity,
-    asset="BTC"
+    asset
 ):
     return Order(
         trader_id=trader_id,
@@ -37,7 +37,7 @@ def make_market_order(
     trader_id,
     side,
     quantity,
-    asset="BTC"
+    asset
 ):
     return Order(
         trader_id=trader_id,
@@ -59,7 +59,7 @@ def make_market_order(
 def generate_random_limit_order(
     trader_id,
     reference_price,
-    asset="BTC",
+    asset,
     max_price_offset=20,
     max_quantity=10
 ):
@@ -92,7 +92,7 @@ def generate_random_limit_order(
 def generate_random_order(
     trader_id,
     reference_price,
-    asset="BTC",
+    asset,
     market_order_probability=0.20,
     max_price_offset=20,
     max_quantity=10

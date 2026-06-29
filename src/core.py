@@ -64,11 +64,15 @@ class Trade:
 
     buy_order_id: int
     sell_order_id: int
+
     buyer_trader_id: int
     seller_trader_id: int
-    
+
+    asset: str
     price: int
     quantity: int
+
+    resting_side: Side
 
     timestamp: datetime
 
@@ -81,29 +85,40 @@ class OrderBook:
 
     def __init__(self):
         
-        self.bids: SortedDict[int, list[Order]] = SortedDict()
-        self.asks: SortedDict[int, list[Order]] = SortedDict()
+        self.bids: dict[str, SortedDict[int, list[Order]]] = {}
+        self.asks: dict[str, SortedDict[int, list[Order]]] = {}
 
         self.order_lookup: dict[int, Order] = {}
+
+        ASSETS = ("BTC", "ETH")
+        
+        self.bids = {
+            asset: SortedDict()
+            for asset in ASSETS
+        }
+
+        self.asks = {
+            asset: SortedDict()
+            for asset in ASSETS
+        }   
 
     def add_order(self, order: Order) -> None:
 
         match order.side:
 
-            case Side.SELL:
-                if order.price not in self.asks:
-                    self.asks[order.price] = []
-
-                self.asks[order.price].append(order)
-
             case Side.BUY:
-                if order.price not in self.bids:
-                    self.bids[order.price] = []
+                book = self.bids[order.asset]
 
-                self.bids[order.price].append(order)
+            case Side.SELL:
+                book = self.asks[order.asset]
 
             case _:
                 raise ValueError("Order side can only be BUY or SELL")
+
+        if order.price not in book:
+            book[order.price] = []
+        
+        book[order.price].append(order)            
 
         self.order_lookup[order.order_id] = order
 
@@ -113,62 +128,69 @@ class OrderBook:
             return False
 
         order = self.order_lookup[orderid]
+        
 
         match order.side:
 
             case Side.SELL:
 
-                self.asks[order.price].remove(order)
+                book = self.asks[order.asset]
+                book[order.price].remove(order)
 
-                if not self.asks[order.price]:
-                    del self.asks[order.price]
+                if not book[order.price]:
+                    del book[order.price]
 
             case Side.BUY:
 
-                self.bids[order.price].remove(order)
+                book = self.bids[order.asset]
+                book[order.price].remove(order)
 
-                if not self.bids[order.price]:
-                    del self.bids[order.price]
+                if not book[order.price]:
+                    del book[order.price]
 
             case _:
-                raise ValueError("Order side can only be BUY or SELL")
+                raise ValueError("Order side can only be BUY or SELL, check asset sorting too")
 
         del self.order_lookup[orderid]
 
         return True
 
-    def get_best_bid(self) -> int | None:
+    def get_best_bid(self, asset: str) -> int | None:
 
-        if not self.bids:
+        book = self.bids[asset]
+
+        if not book:
             return None
 
-        return self.bids.peekitem(-1)[0]
+        return book.peekitem(-1)[0]
 
-    def get_best_ask(self) -> int | None:
+    def get_best_ask(self, asset: str) -> int | None:
 
-        if not self.asks:
+        book = self.asks[asset]
+
+        if not book:
             return None
 
-        return self.asks.peekitem(0)[0]
+        return book.peekitem(0)[0]
 
-    def get_best_bid_order(self) -> Order | None:
+    def get_best_bid_order(self, asset: str) -> Order | None:
 
-        best_bid = self.get_best_bid()
+        best = self.get_best_bid(asset)
 
-        if best_bid is None:
+        if best is None:
             return None
 
-        return self.bids[best_bid][0]
+        return self.bids[asset][best][0]
 
 
-    def get_best_ask_order(self) -> Order | None:
+    def get_best_ask_order(self, asset:str) -> Order | None:
 
-        best_ask = self.get_best_ask()
+        best = self.get_best_ask(asset)
 
-        if best_ask is None:
+        if best is None:
             return None
 
-        return self.asks[best_ask][0]
+        return self.asks[asset][best][0]
 
     def display_book(self):
         pass
@@ -180,12 +202,22 @@ class OrderBook:
 # EXCHANGE
 # =========================
 
+@dataclass
+class ExchangeResult:
+
+    changed_orders: list[Order]
+
+    trades: list[Trade]
+
 
 class Exchange:
     
     def __init__(self, reference_price: int):
         self.reference_price = reference_price
-        self.last_trade_price = reference_price
+        self.last_trade_price = {
+            "BTC": reference_price,
+            "ETH": reference_price,
+        }
 
         self.order_book = OrderBook()
 
@@ -196,13 +228,13 @@ class Exchange:
         self.next_trade_id = 1
 
 
-    def submit_order(self, order: Order) -> list[Order]:
+    def submit_order(self, order: Order) -> ExchangeResult:
 
         order.order_id = self.next_order_id
         self.next_order_id += 1
 
         if not validate_order(order):
-            raise ValueError(...)
+            raise ValueError("invalid order")
 
         self.record_orders(order)
 
@@ -222,16 +254,17 @@ class Exchange:
     def process_order(
         self,
         incoming_order: Order
-    ) -> list[Order]:
+    ) -> ExchangeResult:
 
         changed_orders = {}
+        new_trades = []
 
         while incoming_order.remaining_quantity > 0:  
 
             if incoming_order.side == Side.BUY:
 
                 resting_order = (
-                    self.order_book.get_best_ask_order()
+                    self.order_book.get_best_ask_order(incoming_order.asset)
                 )
 
                 if resting_order is None:
@@ -243,7 +276,7 @@ class Exchange:
             else:
 
                 resting_order = (
-                    self.order_book.get_best_bid_order()
+                    self.order_book.get_best_bid_order(incoming_order.asset)
                 )
 
                 if resting_order is None:
@@ -251,6 +284,8 @@ class Exchange:
 
                 buy_order = resting_order
                 sell_order = incoming_order
+
+            resting_side = resting_order.side
 
             if not orders_can_match( # checks asset, side and makes sure buyer price >= seller price
                 buy_order,
@@ -270,6 +305,7 @@ class Exchange:
 
             trade = Trade(
                 trade_id=self.next_trade_id,
+                resting_side=resting_side,
 
                 buy_order_id=buy_order.order_id,
                 sell_order_id=sell_order.order_id,
@@ -279,6 +315,7 @@ class Exchange:
 
                 price=execution_price,
                 quantity=trade_quantity,
+                asset = buy_order.asset,
 
                 timestamp=datetime.now()
             )
@@ -288,9 +325,10 @@ class Exchange:
             buy_order.remaining_quantity -= trade_quantity
             sell_order.remaining_quantity -= trade_quantity
 
-            self.last_trade_price = execution_price
+            self.last_trade_price[incoming_order.asset] = execution_price
 
             self.record_trade(trade)
+            new_trades.append(trade)
 
             if buy_order.remaining_quantity == 0:
 
@@ -331,19 +369,27 @@ class Exchange:
 
             if incoming_order.order_type == OrderType.MARKET:
                     incoming_order.status = OrderStatus.CANCELLED
+                    changed_orders[incoming_order.order_id] = incoming_order
 
             else:
                 incoming_order.status = OrderStatus.ACTIVE
                 self.order_book.add_order(incoming_order)
 
 
-        return list(changed_orders.values())
+        return ExchangeResult(
+            changed_orders=list(changed_orders.values()),
+            trades=new_trades
+        )
 
     def record_trade(self, trade: Trade):
         self.trade_history.append(trade)
 
-    def record_orders(self, order: Order):
+    def record_orders(self, order: Order): # eventually remove this or revamp this into an updating registry instead of snapshots of submitted orders.
         self.submitted_orders[order.order_id] = deepcopy(order)
+
+
+
+
 
 
 # =========================
@@ -421,11 +467,7 @@ def orders_can_match(
 def determine_execution_price(
     resting_order: Order,
     incoming_order: Order
-) -> int :
-    """
-    Rule 1:
-    
-    """
+    ):
 
     return resting_order.price
 

@@ -1,5 +1,7 @@
 from src.core import OrderStatus, OrderType
 
+ASSETS = ("BTC", "ETH")
+
 
 def analyze_simulation(
     exchange,
@@ -16,16 +18,13 @@ def analyze_simulation(
         for trade in exchange.trade_history
     )
 
-    best_bid = exchange.order_book.get_best_bid()
-    best_ask = exchange.order_book.get_best_ask()
+    submitted = len(
+        exchange.submitted_orders
+    )
 
-    spread = None
-
-    if (
-        best_bid is not None
-        and best_ask is not None
-    ):
-        spread = best_ask - best_bid
+    orders_per_second = (
+        submitted / runtime
+    )
 
     # ==========================
     # INVARIANT CHECKS
@@ -58,15 +57,14 @@ def analyze_simulation(
         if order.remaining_quantity == 0:
             zero_qty_orders += 1
 
-    # ==========================
-    # PERFORMANCE
-    # ==========================
-
-    submitted = len(exchange.submitted_orders)
-
-    orders_per_second = (
-        submitted / runtime
-    )
+    all_tests_passed = all([
+        filled_in_book == 0,
+        cancelled_in_book == 0,
+        negative_qty == 0,
+        overfilled_orders == 0,
+        market_orders_in_book == 0,
+        zero_qty_orders == 0,
+    ])
 
     # ==========================
     # REPORT
@@ -83,16 +81,60 @@ def analyze_simulation(
         f"{len(exchange.order_book.order_lookup)}"
     )
 
-    print(
-        f"Last Trade Price: "
-        f"{exchange.last_trade_price}"
-    )
+    print()
 
-    print(f"Best Bid: {best_bid}")
-    print(f"Best Ask: {best_ask}")
-    print(f"Spread: {spread}")
+    for asset in ASSETS:
 
-    print("\n=== PERFORMANCE ===")
+        best_bid = exchange.order_book.get_best_bid(asset)
+        best_ask = exchange.order_book.get_best_ask(asset)
+
+        spread = None
+
+        if (
+            best_bid is not None
+            and best_ask is not None
+        ):
+            spread = best_ask - best_bid
+
+        asset_volume = sum(
+            trade.quantity
+            for trade in exchange.trade_history
+            if trade.asset == asset
+        )
+
+        asset_trades = [
+            trade
+            for trade in exchange.trade_history
+            if trade.asset == asset
+        ]
+
+        if asset_volume > 0:
+
+            vwap = (
+                sum(
+                    trade.price * trade.quantity
+                    for trade in asset_trades
+                )
+                / asset_volume
+            )
+
+        else:
+            vwap = None
+
+        print(f"--- {asset} ---")
+        print(
+            f"Last Trade Price: "
+            f"{exchange.last_trade_price[asset]}"
+        )
+        print(f"Volume: {asset_volume}")
+        print(f"Trades: {len(asset_trades)}")
+        print(f"Best Bid: {best_bid}")
+        print(f"Best Ask: {best_ask}")
+        print(f"Spread: {spread}")
+        print(f"VWAP: {vwap}")
+        print()
+
+    print("=== PERFORMANCE ===")
 
     print(
         f"Runtime: {runtime:.4f} seconds"
@@ -135,34 +177,14 @@ def analyze_simulation(
         f"{zero_qty_orders}"
     )
 
-    all_tests_passed = all([
-        filled_in_book == 0,
-        cancelled_in_book == 0,
-        negative_qty == 0,
-        overfilled_orders == 0,
-        market_orders_in_book == 0,
-        zero_qty_orders == 0,
-    ])
+    print("\n=== Trader Stats ===")
 
-    print("\n=== Trader stats ===")
     for trader in traders:
 
         print(
             trader.trader_id,
             len(trader.active_orders)
         )
-
-    print("\n=== VWAP ===")
-    vwap = (
-        sum(
-            trade.price * trade.quantity
-            for trade in exchange.trade_history
-        )
-        /
-        total_volume
-    )
-    print(vwap)
-
 
     print("\n=== TEST RESULT ===")
 
