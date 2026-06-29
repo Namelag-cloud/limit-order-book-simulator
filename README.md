@@ -21,7 +21,8 @@ A Python implementation of a continuous double-auction exchange for exploring ma
 - Trader Base Class
 - RandomTrader Agent
 - Active Order Tracking
-
+- Portfolio Accounting
+  
 ## Current Focus
 
 The simulator currently prioritizes exchange correctness and modular architecture before introducing realistic trader behavior, market dynamics, and research experiments.
