@@ -9,6 +9,7 @@ from src.core import (
     OrderStatus,
 )
 from src.helper import make_limit_order
+import pytest
 
 
 ASSET = "BTC"
@@ -244,27 +245,27 @@ def test_cancel_order():
 
     exchange.submit_order(sell)
 
-    result = exchange.cancel_order(
-        sell.order_id
-    )
+    result = exchange.cancel_order(sell.order_id)
 
-    assert result is True
+    assert len(result.trades) == 0
+    assert len(result.changed_orders) == 1
 
-    assert sell.status == OrderStatus.CANCELLED
+    cancelled_order = result.changed_orders[0]
 
-    assert sell.order_id not in (
-        exchange.order_book.order_lookup
-    )
+    assert cancelled_order.order_id == sell.order_id
+    assert cancelled_order.status == OrderStatus.CANCELLED
 
-    assert not exchange.order_book.asks[ASSET]
+    assert sell.order_id not in exchange.order_book.order_lookup
 
 def test_cancel_nonexistent_order():
 
     exchange = Exchange(reference_price=100)
 
-    result = exchange.cancel_order(999999)
-
-    assert result is False
+    with pytest.raises(
+        ValueError,
+        match="Unknown order ID",
+    ):
+        exchange.cancel_order(999999)
 
 
 def test_market_order_sweeps_multiple_levels():
