@@ -125,9 +125,25 @@ class RandomTrader(Trader):
     max_price_offset: int = 20
     max_quantity: int = 10
 
+    max_order_age: int = 100
+
 
 
     def step(self, exchange):
+
+
+        if self.active_orders:
+
+            oldest_order = min(
+                self.active_orders.values(),
+                key=lambda order: order.created_tick,
+            )
+
+            age = exchange.current_tick - oldest_order.created_tick
+
+            if age >= self.max_order_age:
+                return oldest_order.order_id
+                
 
         asset = random.choice([
             "BTC",

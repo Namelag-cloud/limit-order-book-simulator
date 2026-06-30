@@ -13,46 +13,127 @@ from src.traders.trader import (
     Portfolio,
 )
 
-random.seed(42)
-
-NUM_TRADERS = 10
-NUM_SUBMISSIONS = 100_000
 
 
-def make_portfolio() -> Portfolio:
+
+def make_portfolio(
+    cash: int,
+    inventory: int,
+) -> Portfolio:
 
     return Portfolio(
-        cash=100_000,
+        cash=cash,
         inventory={
-            "BTC": 50,
-            "ETH": 50,
+            "BTC": inventory,
+            "ETH": inventory,
         },
     )
 
 
-exchange = Exchange(
-    reference_price=10_000
-)
+EXPERIMENTS = [
 
-traders = [
-    RandomTrader(
-        trader_id=i,
-        portfolio=make_portfolio(),
-    )
-    for i in range(1, NUM_TRADERS + 1)
+    {
+        "name": "Baseline",
+        "num_traders": 10,
+        "cash": 100_000,
+        "inventory": 50,
+        "submissions": 100_000,
+    },
+
+    {
+        "name": "More Traders",
+        "num_traders": 100,
+        "cash": 100_000,
+        "inventory": 50,
+        "submissions": 100_000,
+    },
+
+    {
+        "name": "Low Inventory",
+        "num_traders": 10,
+        "cash": 100_000,
+        "inventory": 5,
+        "submissions": 100_000,
+    },
+
+    {
+        "name": "High Inventory",
+        "num_traders": 10,
+        "cash": 100_000,
+        "inventory": 500,
+        "submissions": 100_000,
+    },
+
+    {
+        "name": "Low Cash",
+        "num_traders": 10,
+        "cash": 10_000,
+        "inventory": 50,
+        "submissions": 100_000,
+    },
+
+    {
+        "name": "High Cash",
+        "num_traders": 10,
+        "cash": 1_000_000,
+        "inventory": 50,
+        "submissions": 100_000,
+    },
+
+    {
+        "name": "1 Million Orders",
+        "num_traders": 10,
+        "cash": 100_000,
+        "inventory": 50,
+        "submissions": 1_000_000,
+    },
+
+    {
+        "name": "5 Million Orders",
+        "num_traders": 10,
+        "cash": 100_000,
+        "inventory": 50,
+        "submissions": 5_000_000,
+    },
+
+    {
+    "name": "Baseline Repeat",
+    "num_traders": 10,
+    "cash": 100_000,
+    "inventory": 50,
+    "submissions": 100_000,
+    },
 ]
 
 
 def run_simulation(
-    exchange,
-    traders,
+    num_traders,
+    initial_cash,
+    initial_inventory,
     num_submissions,
 ):
+
+    traders = [
+        RandomTrader(
+            trader_id=i,
+            portfolio=make_portfolio(
+                initial_cash, 
+                initial_inventory
+            ),
+        )
+        for i in range(1, num_traders + 1)
+    ]
 
     trader_lookup = {
         trader.trader_id: trader
         for trader in traders
     }
+
+    exchange = Exchange(
+        reference_price=10_000
+    )
+
+    iterations_without_order = 0
 
     for _ in range(num_submissions):
 
@@ -62,43 +143,45 @@ def run_simulation(
 
         trader = random.choice(traders)
 
-        order = trader.step(exchange)
+        action = trader.step(exchange)
 
-        if order is None:
+        if action is None:
+            iterations_without_order += 1
             continue
 
-        # ==========================
-        # Exchange
-        # ==========================
+        elif isinstance(action, int):
+            result = exchange.cancel_order(action) # cancel_order takes order_id 
+        
+        else:
+            order = action
+            result = exchange.submit_order(action) # this accepts the actual trade object
 
-        result = exchange.submit_order(order)
+            # ==========================
+            # New Resting Limit Order
+            # ==========================
 
-        # ==========================
-        # New Resting Limit Order
-        # ==========================
+            if (
+                order.order_type == OrderType.LIMIT
+                and order.status == OrderStatus.ACTIVE
+            ):
 
-        if (
-            order.order_type == OrderType.LIMIT
-            and order.status == OrderStatus.ACTIVE
-        ):
+                trader.active_orders[
+                    order.order_id
+                ] = order
 
-            trader.active_orders[
-                order.order_id
-            ] = order
+                if order.side == Side.BUY: # reserve cash or inventroy depending on the side.
 
-            if order.side == Side.BUY: # reserve cash or inventroy depending on the side.
+                    trader.portfolio.reserve_cash(
+                        order.remaining_quantity
+                        * order.price
+                    )
 
-                trader.portfolio.reserve_cash(
-                    order.remaining_quantity
-                    * order.price
-                )
+                else:
 
-            else:
-
-                trader.portfolio.reserve_inventory(
-                    order.asset,
-                    order.remaining_quantity
-                )
+                    trader.portfolio.reserve_inventory(
+                        order.asset,
+                        order.remaining_quantity
+                    )
 
         # ==========================
         # Trade Settlement
@@ -113,7 +196,7 @@ def run_simulation(
             seller = trader_lookup[
                 trade.seller_trader_id
             ]
-
+            
             # Portfolio settlement
 
             buyer.portfolio.buy(
@@ -187,177 +270,75 @@ def run_simulation(
                         changed_order.remaining_quantity
                     )
 
+        
+        for trader in traders:
+            for order_id in trader.active_orders:
 
-start = perf_counter()
+                assert (
+                    order_id
+                    in exchange.order_book.order_lookup
+                )
+                    
 
-run_simulation(
-    exchange,
-    traders,
-    NUM_SUBMISSIONS,
-)
 
-runtime = perf_counter() - start
+    return exchange, traders, iterations_without_order
 
-analyze_simulation(
-    exchange,
-    traders,
-    runtime,
-)
+summary = []
 
-ASSETS = ("BTC", "ETH")
+for experiment in EXPERIMENTS:
 
-print("\n=== ENGINE INVARIANTS ===")
+    random.seed(42)
 
-checks = []
+    print("\n" + "=" * 80)
+    print(f"EXPERIMENT: {experiment['name']}")
+    print("=" * 80)
 
-# =====================================
-# Portfolio Invariants
-# =====================================
-
-for trader in traders:
-
-    p = trader.portfolio
-
-    checks.append(p.cash >= 0)
-    checks.append(p.reserved_cash >= 0)
-
-    for asset in ASSETS:
-
-        checks.append(
-            p.inventory.get(asset, 0) >= 0
-        )
-
-        checks.append(
-            p.reserved_inventory.get(asset, 0) >= 0
-        )
-
-        # Reserved inventory cannot exceed inventory
-
-        checks.append(
-            p.reserved_inventory.get(asset, 0)
-            <=
-            p.inventory.get(asset, 0)
-        )
-
-    # Reserved cash should never exceed cash
-
-    checks.append(
-        p.reserved_cash <= p.cash
+    print(
+        f"""
+Traders      : {experiment['num_traders']}
+Cash         : {experiment['cash']}
+Inventory    : {experiment['inventory']}
+Submissions  : {experiment['submissions']}
+"""
     )
 
-# =====================================
-# Active Order Accounting
-# =====================================
+    start = perf_counter()
 
-for trader in traders:
-
-    reserved_cash = 0
-
-    reserved_inventory = {
-        asset: 0
-        for asset in ASSETS
-    }
-
-    for order in trader.active_orders.values():
-
-        assert order.status in (
-            OrderStatus.ACTIVE,
-            OrderStatus.PARTIALLY_FILLED,
-        )
-
-        if order.order_type != OrderType.LIMIT:
-            continue
-
-        if order.side == Side.BUY:
-
-            reserved_cash += (
-                order.remaining_quantity
-                * order.price
-            )
-
-        else:
-
-            reserved_inventory[
-                order.asset
-            ] += order.remaining_quantity
-
-    checks.append(
-        trader.portfolio.reserved_cash
-        == reserved_cash
+    exchange, traders, iterations_without_order = run_simulation(
+        num_traders=experiment["num_traders"],
+        initial_cash=experiment["cash"],
+        initial_inventory=experiment["inventory"],
+        num_submissions=experiment["submissions"],
     )
 
-    for asset in ASSETS:
+    runtime = perf_counter() - start
 
-        checks.append(
-            trader.portfolio.reserved_inventory.get(asset, 0)
-            ==
-            reserved_inventory[asset]
-        )
-
-# =====================================
-# Order Book Invariants
-# =====================================
-
-for asset in ASSETS:
-
-    best_bid = exchange.order_book.get_best_bid(asset)
-    best_ask = exchange.order_book.get_best_ask(asset)
-
-    checks.append(
-        best_bid is None
-        or best_ask is None
-        or best_bid < best_ask
+    passed = analyze_simulation(
+        exchange,
+        traders,
+        runtime,
     )
 
-# =====================================
-# Order Registry
-# =====================================
+    summary.append({
+        "Experiment": experiment["name"],
+        "Runtime": runtime,
+        "Orders": experiment["submissions"],
+        "No Order": iterations_without_order,
+        "PASS": passed,
+    })
 
-for order in exchange.order_book.order_lookup.values():
 
-    checks.append(
-        order.status in (
-            OrderStatus.ACTIVE,
-            OrderStatus.PARTIALLY_FILLED,
-        )
+print("\n")
+print("=" * 100)
+print("SUMMARY")
+print("=" * 100)
+
+for result in summary:
+
+    print(
+        f"{result['Experiment']:<25}"
+        f"{result['Orders']:<12,}"
+        f"{result['Runtime']:<10.2f}"
+        f"{'PASS' if result['PASS'] else 'FAIL':<12}"
+        f"{result['No Order']:<15}"
     )
-
-    checks.append(
-        order.remaining_quantity > 0
-    )
-
-# =====================================
-# Conservation of Assets
-# =====================================
-
-for asset in ASSETS:
-
-    total_inventory = sum(
-        trader.portfolio.inventory.get(asset, 0)
-        for trader in traders
-    )
-
-    checks.append(total_inventory == 50 * NUM_TRADERS)
-
-# =====================================
-# Conservation of Cash
-# =====================================
-
-checks.append(
-
-    sum(
-        trader.portfolio.cash
-        for trader in traders
-    )
-
-    ==
-
-    100_000 * NUM_TRADERS
-
-)
-
-print(
-    "PASS"
-    if all(checks)
-    else "FAIL"
-)

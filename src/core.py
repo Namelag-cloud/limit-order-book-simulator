@@ -57,6 +57,7 @@ class Order:
     
     order_id: int | None = None
 
+    created_tick: int = 0
 
 @dataclass
 class Trade:
@@ -226,6 +227,7 @@ class Exchange:
 
         self.next_order_id = 1
         self.next_trade_id = 1
+        self.current_tick: int = 0
 
 
     def submit_order(self, order: Order) -> ExchangeResult:
@@ -238,23 +240,29 @@ class Exchange:
 
         self.record_orders(order)
 
+        self.current_tick += 1
+        order.created_tick = self.current_tick
+
         return self.process_order(order)
 
-    def cancel_order(self, order_id: int) -> bool: 
+    def cancel_order(self,order_id: int,) -> ExchangeResult:
 
         if order_id not in self.order_book.order_lookup:
-            return False
+            raise ValueError("Unknown order ID, trader access/info problem if on a sim run")
 
         order = self.order_book.order_lookup[order_id]
 
         order.status = OrderStatus.CANCELLED
 
-        return self.order_book.remove_order(order_id)
+        self.order_book.remove_order(order_id)
 
-    def process_order(
-        self,
-        incoming_order: Order
-    ) -> ExchangeResult:
+        return ExchangeResult(
+            changed_orders=[order],
+            trades=[],
+        )
+
+
+    def process_order(self,incoming_order: Order) -> ExchangeResult:
 
         changed_orders = {}
         new_trades = []
